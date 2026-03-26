@@ -1,12 +1,13 @@
 // Firebase конфигурация (ЗАМЕНИТЕ НА ВАШУ!)
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_AUTH_DOMAIN",
-    databaseURL: "YOUR_DATABASE_URL",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_STORAGE_BUCKET",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyDKxNW7ts31s3ozhsfh0kOyIaBBS40DmXY",
+  authDomain: "game-baf45.firebaseapp.com",
+  databaseURL: "https://game-baf45-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "game-baf45",
+  storageBucket: "game-baf45.firebasestorage.app",
+  messagingSenderId: "347487901668",
+  appId: "1:347487901668:web:6a8fb88900d63c0f4519f1",
+  measurementId: "G-CT66YK2B01"
 };
 
 // Инициализация Firebase
