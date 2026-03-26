@@ -3,9 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>ColorMatch Duel</title>
+    <title>ColorMatch Online</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://telegram.org/js/telegram-web-app.js?56"></script>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 </head>
 <body>
     <div id="app">
@@ -14,48 +17,31 @@
             <div class="card">
                 <div class="logo">
                     <div class="gradient-circle"></div>
-                    <h1>🎨 ColorMatch Duel</h1>
+                    <h1>🎨 ColorMatch Online</h1>
                 </div>
-                <p class="subtitle">Проверь свою цветовую память!</p>
-                <button id="playBtn" class="btn btn-primary">👥 Играть вдвоем</button>
+                <p class="subtitle">Соревнуйся с друзьями онлайн!</p>
+                <button id="createGameBtn" class="btn btn-primary">✨ Создать игру</button>
+                <button id="joinGameBtn" class="btn btn-outline">🔗 Присоединиться</button>
+                <div id="joinPanel" style="display: none; margin-top: 16px;">
+                    <input type="text" id="gameCodeInput" placeholder="Код игры" class="input-field">
+                    <button id="confirmJoinBtn" class="btn btn-primary" style="margin-top: 8px;">Присоединиться</button>
+                </div>
                 <button id="rulesBtn" class="btn btn-outline">📖 Правила</button>
-                <div class="made-by">
-                    <span>Соревнуйся с другом</span>
-                </div>
             </div>
         </div>
 
-        <!-- Правила -->
-        <div id="rulesScreen" class="screen">
+        <!-- Ожидание игрока -->
+        <div id="waitingScreen" class="screen">
             <div class="card">
-                <h2>📖 Правила игры</h2>
-                <div class="rules-list">
-                    <div class="rule-item">
-                        <span class="rule-icon">🎲</span>
-                        <span>Каждый игрок проходит 5 раундов</span>
-                    </div>
-                    <div class="rule-item">
-                        <span class="rule-icon">⏱️</span>
-                        <span>На 3 секунды показывается случайный цвет</span>
-                    </div>
-                    <div class="rule-item">
-                        <span class="rule-icon">🎛️</span>
-                        <span>Воссоздай цвет с помощью ползунков</span>
-                    </div>
-                    <div class="rule-item">
-                        <span class="rule-icon">🔴</span>
-                        <span><strong>Оттенок</strong> — от красного до красного (0-360°)</span>
-                    </div>
-                    <div class="rule-item">
-                        <span class="rule-icon">🌈</span>
-                        <span><strong>Насыщенность</strong> — интенсивность цвета</span>
-                    </div>
-                    <div class="rule-item">
-                        <span class="rule-icon">💡</span>
-                        <span><strong>Яркость</strong> — светлота цвета</span>
-                    </div>
+                <div class="loading-spinner"></div>
+                <h2 id="waitingTitle">Ожидание соперника...</h2>
+                <div class="game-code-box">
+                    <p>Код игры:</p>
+                    <div class="game-code" id="gameCodeDisplay">XXXXXX</div>
+                    <button id="copyCodeBtn" class="btn btn-outline" style="margin-top: 12px;">📋 Скопировать код</button>
                 </div>
-                <button id="backFromRules" class="btn btn-primary">Назад в меню</button>
+                <p style="text-align: center; margin-top: 20px;">Отправьте код другу, чтобы он присоединился</p>
+                <button id="cancelGameBtn" class="btn btn-outline" style="margin-top: 20px;">Отмена</button>
             </div>
         </div>
 
@@ -65,8 +51,17 @@
                 <div class="round-info">
                     Раунд <span id="currentRound">1</span>/5
                 </div>
-                <div id="turnIndicator" class="turn-indicator">
-                    Ход: Игрок 1
+                <div id="playerStatus" class="turn-indicator">
+                    Ваш ход
+                </div>
+            </div>
+
+            <!-- Информация о сопернике -->
+            <div class="opponent-info" id="opponentInfo">
+                <div class="opponent-card">
+                    <span>👤 Соперник:</span>
+                    <span id="opponentName">Ожидание...</span>
+                    <span id="opponentScore">0%</span>
                 </div>
             </div>
 
@@ -127,6 +122,9 @@
                     <div class="accuracy-percent" id="accuracyPercent">0%</div>
                 </div>
                 <button id="nextRoundBtn" class="btn btn-primary">Следующий раунд →</button>
+                <div id="waitingOpponentMsg" style="display: none; text-align: center; margin-top: 16px; color: #666;">
+                    ⏳ Ожидание соперника...
+                </div>
             </div>
         </div>
 
@@ -136,8 +134,42 @@
                 <h2>🏆 Результаты</h2>
                 <div class="scoreboard" id="scoreboard"></div>
                 <div id="winnerMessage" class="winner-message"></div>
-                <button id="playAgainBtn" class="btn btn-primary">🔄 Играть снова</button>
-                <button id="menuBtn" class="btn btn-outline">🏠 Главное меню</button>
+                <button id="playAgainOnlineBtn" class="btn btn-primary">🔄 Играть снова</button>
+                <button id="menuFromResultsBtn" class="btn btn-outline">🏠 Главное меню</button>
+            </div>
+        </div>
+
+        <!-- Правила -->
+        <div id="rulesScreen" class="screen">
+            <div class="card">
+                <h2>📖 Правила игры</h2>
+                <div class="rules-list">
+                    <div class="rule-item">
+                        <span class="rule-icon">🎲</span>
+                        <span>Каждый игрок проходит 5 раундов</span>
+                    </div>
+                    <div class="rule-item">
+                        <span class="rule-icon">⏱️</span>
+                        <span>На 3 секунды показывается случайный цвет</span>
+                    </div>
+                    <div class="rule-item">
+                        <span class="rule-icon">🎛️</span>
+                        <span>Воссоздай цвет с помощью ползунков</span>
+                    </div>
+                    <div class="rule-item">
+                        <span class="rule-icon">🔴</span>
+                        <span><strong>Оттенок</strong> — от красного до красного (0-360°)</span>
+                    </div>
+                    <div class="rule-item">
+                        <span class="rule-icon">🌈</span>
+                        <span><strong>Насыщенность</strong> — интенсивность цвета</span>
+                    </div>
+                    <div class="rule-item">
+                        <span class="rule-icon">💡</span>
+                        <span><strong>Яркость</strong> — светлота цвета</span>
+                    </div>
+                </div>
+                <button id="backFromRulesBtn" class="btn btn-primary">Назад в меню</button>
             </div>
         </div>
     </div>
