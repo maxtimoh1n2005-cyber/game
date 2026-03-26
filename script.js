@@ -1,13 +1,13 @@
 // Firebase конфигурация (ЗАМЕНИТЕ НА ВАШУ!)
-const firebaseConfig = {
-  apiKey: "AIzaSyDKxNW7ts31s3ozhsfh0kOyIaBBS40DmXY",
-  authDomain: "game-baf45.firebaseapp.com",
-  databaseURL: "https://game-baf45-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "game-baf45",
-  storageBucket: "game-baf45.firebasestorage.app",
-  messagingSenderId: "347487901668",
-  appId: "1:347487901668:web:6a8fb88900d63c0f4519f1",
-  measurementId: "G-CT66YK2B01"
+const firebaseConfig = { 
+  apiKey : "AIzaSyDKxNW7ts31s3ozhsfh0kOyIaBBS40DmXY" , 
+  authDomain : "game-baf45.firebaseapp.com" , 
+  databaseURL : "https://game-baf45-default-rtdb.europe-west1.firebasedatabase.app" , 
+  projectId : "game-baf45" , 
+  storageBucket : "game-baf45.firebasestorage.app" , 
+  messagingSenderId : "347487901668" , 
+  appId : "1:347487901668:web:6a8fb88900d63c0f4519f1" , 
+  measurementId : "G-CT66YK2B01" 
 };
 
 // Инициализация Firebase
@@ -22,21 +22,20 @@ tg.enableClosingConfirmation();
 // Глобальные переменные
 let currentGameId = null;
 let currentPlayerId = null;
-let playerNumber = null; // 0 - создатель, 1 - присоединившийся
+let playerNumber = null;
 let gameState = {
     players: [],
-    currentTurn: 0,
+    currentTurn: null,
     round: 1,
-    gameActive: true,
-    currentColor: null,
-    waitingForNext: false
+    gameActive: true
 };
 
 let localGameData = {
     scores: [],
     currentRound: 1,
     timerInterval: null,
-    originalColor: null
+    originalColor: null,
+    waitingForNext: false
 };
 
 // DOM элементы
@@ -48,6 +47,11 @@ const screens = {
     rules: document.getElementById('rulesScreen')
 };
 
+// Генерация безопасного ID (без точек и спецсимволов)
+function generateSafeId() {
+    return `p_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+}
+
 // Генерация кода игры
 function generateGameCode() {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -57,7 +61,7 @@ function generateGameCode() {
 async function createGame() {
     const gameCode = generateGameCode();
     currentGameId = gameCode;
-    currentPlayerId = `player_${Date.now()}_${Math.random()}`;
+    currentPlayerId = generateSafeId();
     playerNumber = 0;
     
     const gameData = {
@@ -76,7 +80,14 @@ async function createGame() {
         createdAt: Date.now()
     };
     
-    await database.ref(`games/${gameCode}`).set(gameData);
+    try {
+        await database.ref(`games/${gameCode}`).set(gameData);
+        console.log('Игра создана:', gameCode);
+    } catch (error) {
+        console.error('Ошибка создания игры:', error);
+        showToast('Ошибка создания игры');
+        return;
+    }
     
     document.getElementById('gameCodeDisplay').textContent = gameCode;
     document.getElementById('waitingTitle').textContent = 'Ожидание соперника...';
@@ -87,6 +98,7 @@ async function createGame() {
     database.ref(`games/${gameCode}/players`).on('value', (snapshot) => {
         const players = snapshot.val();
         if (players && Object.keys(players).length === 2) {
+            console.log('Второй игрок подключился!');
             startOnlineGame();
         }
     });
@@ -95,10 +107,13 @@ async function createGame() {
 // Присоединение к игре
 function joinGame() {
     const gameCode = document.getElementById('gameCodeInput').value.toUpperCase();
-    if (!gameCode) return;
+    if (!gameCode) {
+        showToast('Введите код игры');
+        return;
+    }
     
     currentGameId = gameCode;
-    currentPlayerId = `player_${Date.now()}_${Math.random()}`;
+    currentPlayerId = generateSafeId();
     playerNumber = 1;
     
     const gameRef = database.ref(`games/${gameCode}`);
@@ -123,7 +138,12 @@ function joinGame() {
             playerNum: 1
         };
         
-        database.ref().update(updates);
+        database.ref().update(updates).then(() => {
+            console.log('Присоединился к игре');
+        }).catch(error => {
+            console.error('Ошибка присоединения:', error);
+            showToast('Ошибка присоединения');
+        });
         
         screens.menu.classList.remove('active');
         screens.waiting.classList.add('active');
@@ -144,6 +164,11 @@ function startOnlineGame() {
     screens.waiting.classList.remove('active');
     screens.game.classList.add('active');
     
+    // Обновляем статус игры
+    database.ref(`games/${currentGameId}`).update({
+        status: 'playing'
+    });
+    
     // Получаем данные игроков
     database.ref(`games/${currentGameId}/players`).once('value', (snapshot) => {
         const players = snapshot.val();
@@ -154,19 +179,26 @@ function startOnlineGame() {
         
         gameState.players = playerList;
         
-        // Определяем очередность
         const myPlayer = playerList.find(p => p.id === currentPlayerId);
         const opponent = playerList.find(p => p.id !== currentPlayerId);
         
-        document.getElementById('opponentName').textContent = opponent.name;
-        
-        // Слушаем изменения игры
-        listenToGameUpdates();
-        
-        // Если первый игрок - начинаем первый раунд
-        if (myPlayer.playerNum === 0 && gameState.currentTurn === currentPlayerId) {
-            startRound();
+        if (opponent) {
+            document.getElementById('opponentName').textContent = opponent.name;
         }
+        
+        // Получаем текущий ход
+        database.ref(`games/${currentGameId}/currentTurn`).once('value', (snapshot) => {
+            gameState.currentTurn = snapshot.val();
+            document.getElementById('currentRound').textContent = gameState.round;
+            
+            // Слушаем обновления игры
+            listenToGameUpdates();
+            
+            // Если мой ход - начинаем
+            if (gameState.currentTurn === currentPlayerId) {
+                startRound();
+            }
+        });
     });
 }
 
@@ -178,17 +210,15 @@ function listenToGameUpdates() {
         const game = snapshot.val();
         if (!game) return;
         
-        // Обновляем состояние игры
         gameState.currentTurn = game.currentTurn;
         gameState.round = game.round;
         
         document.getElementById('currentRound').textContent = gameState.round;
         
-        // Проверяем, чей ход
         const isMyTurn = gameState.currentTurn === currentPlayerId;
         const playerStatus = document.getElementById('playerStatus');
         
-        if (isMyTurn && !localGameData.waitingForNext) {
+        if (isMyTurn && !localGameData.waitingForNext && !document.getElementById('resultBlock').style.display === 'block') {
             playerStatus.textContent = 'Ваш ход';
             playerStatus.style.background = '#4caf50';
         } else if (!isMyTurn) {
@@ -201,8 +231,8 @@ function listenToGameUpdates() {
             showOnlineResults(game);
         }
         
-        // Если соперник закончил раунд и мы ждем
-        if (game.waitingForNext && localGameData.waitingForNext) {
+        // Если соперник закончил раунд
+        if (game.waitingForNext && localGameData.waitingForNext && game.playerReady !== currentPlayerId) {
             document.getElementById('waitingOpponentMsg').style.display = 'none';
             nextRoundOnline();
         }
@@ -222,6 +252,10 @@ function startRound() {
     let timeLeft = 3;
     document.getElementById('timerNumber').textContent = timeLeft;
     
+    if (localGameData.timerInterval) {
+        clearInterval(localGameData.timerInterval);
+    }
+    
     localGameData.timerInterval = setInterval(() => {
         timeLeft--;
         document.getElementById('timerNumber').textContent = timeLeft >= 0 ? timeLeft : 0;
@@ -238,7 +272,6 @@ function startGuessingPhase() {
     document.getElementById('showColorBlock').style.display = 'none';
     document.getElementById('guessBlock').style.display = 'block';
     
-    // Сброс ползунков
     document.getElementById('hueSlider').value = 0;
     document.getElementById('satSlider').value = 100;
     document.getElementById('briSlider').value = 100;
@@ -249,7 +282,9 @@ function startGuessingPhase() {
 async function submitResult() {
     if (localGameData.waitingForNext) return;
     
-    clearInterval(localGameData.timerInterval);
+    if (localGameData.timerInterval) {
+        clearInterval(localGameData.timerInterval);
+    }
     
     const h = parseInt(document.getElementById('hueSlider').value);
     const s = parseInt(document.getElementById('satSlider').value);
@@ -264,10 +299,13 @@ async function submitResult() {
     const accuracy = calculateAccuracy(originalRgb, guessedRgb);
     localGameData.scores.push(accuracy);
     
-    // Сохраняем результат в Firebase
-    await database.ref(`games/${currentGameId}/players/${currentPlayerId}/scores`).set(localGameData.scores);
+    try {
+        await database.ref(`games/${currentGameId}/players/${currentPlayerId}/scores`).set(localGameData.scores);
+        console.log('Результат сохранен:', accuracy);
+    } catch (error) {
+        console.error('Ошибка сохранения результата:', error);
+    }
     
-    // Показываем результат
     document.getElementById('guessBlock').style.display = 'none';
     document.getElementById('resultBlock').style.display = 'block';
     
@@ -277,7 +315,6 @@ async function submitResult() {
     
     localGameData.waitingForNext = true;
     
-    // Уведомляем о готовности к следующему раунду
     await database.ref(`games/${currentGameId}`).update({
         waitingForNext: true,
         playerReady: currentPlayerId
@@ -292,7 +329,6 @@ async function nextRoundOnline() {
     localGameData.currentRound++;
     
     if (localGameData.currentRound > 5) {
-        // Проверяем, закончили ли оба игрока
         const playersSnapshot = await database.ref(`games/${currentGameId}/players`).once('value');
         const players = playersSnapshot.val();
         const allFinished = Object.values(players).every(p => p.scores && p.scores.length === 5);
@@ -302,7 +338,6 @@ async function nextRoundOnline() {
                 status: 'finished'
             });
         } else {
-            // Передаем ход другому игроку
             const nextPlayer = gameState.players.find(p => p.id !== currentPlayerId).id;
             await database.ref(`games/${currentGameId}`).update({
                 currentTurn: nextPlayer,
@@ -313,13 +348,8 @@ async function nextRoundOnline() {
             
             document.getElementById('resultBlock').style.display = 'none';
             document.getElementById('waitingOpponentMsg').style.display = 'none';
-            
-            if (nextPlayer === currentPlayerId) {
-                startRound();
-            }
         }
     } else {
-        // Передаем ход другому игроку
         const nextPlayer = gameState.players.find(p => p.id !== currentPlayerId).id;
         await database.ref(`games/${currentGameId}`).update({
             currentTurn: nextPlayer,
@@ -329,10 +359,6 @@ async function nextRoundOnline() {
         });
         
         document.getElementById('resultBlock').style.display = 'none';
-        
-        if (nextPlayer === currentPlayerId) {
-            startRound();
-        }
     }
 }
 
@@ -343,36 +369,42 @@ function showOnlineResults(game) {
     
     const players = Object.values(game.players);
     players.forEach(p => {
-        p.avg = p.scores.reduce((a, b) => a + b, 0) / p.scores.length;
+        if (p.scores && p.scores.length > 0) {
+            p.avg = p.scores.reduce((a, b) => a + b, 0) / p.scores.length;
+        } else {
+            p.avg = 0;
+        }
     });
     
     const scoreboard = document.getElementById('scoreboard');
     scoreboard.innerHTML = `
-        <div class="score-row" style="font-weight: bold;">
+        <div class="score-row" style="font-weight: bold; background: var(--tg-theme-secondary-bg-color, #e9e9e9);">
             <span>Игрок</span>
             <span>Точность</span>
             <span>Лучший раунд</span>
         </div>
         ${players.map(p => `
-            <div class="score-row ${p.avg > players[1 - players.indexOf(p)].avg ? 'winner' : ''}">
+            <div class="score-row">
                 <span>${p.name}</span>
                 <span><strong>${p.avg.toFixed(2)}%</strong></span>
-                <span>${Math.max(...p.scores).toFixed(1)}%</span>
+                <span>${p.scores && p.scores.length ? Math.max(...p.scores).toFixed(1) : '0'}%</span>
             </div>
         `).join('')}
     `;
     
     const winnerMsg = document.getElementById('winnerMessage');
-    if (players[0].avg > players[1].avg) {
-        winnerMsg.textContent = `🏆 Победил ${players[0].name}! 🏆`;
-    } else if (players[1].avg > players[0].avg) {
-        winnerMsg.textContent = `🏆 Победил ${players[1].name}! 🏆`;
-    } else {
-        winnerMsg.textContent = '🤝 Ничья! Отличная игра! 🤝';
+    if (players[0] && players[1]) {
+        if (players[0].avg > players[1].avg) {
+            winnerMsg.textContent = `🏆 Победил ${players[0].name}! 🏆`;
+        } else if (players[1].avg > players[0].avg) {
+            winnerMsg.textContent = `🏆 Победил ${players[1].name}! 🏆`;
+        } else {
+            winnerMsg.textContent = '🤝 Ничья! Отличная игра! 🤝';
+        }
     }
 }
 
-// Вспомогательные функции (HSV, RGB, точность)
+// Вспомогательные функции
 function hsvToRgb(h, s, v) {
     h = (h % 360 + 360) % 360;
     s = Math.min(100, Math.max(0, s)) / 100;
@@ -433,50 +465,67 @@ function showToast(message) {
     const toast = document.createElement('div');
     toast.className = 'toast-message';
     toast.textContent = message;
+    toast.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0,0,0,0.8);
+        color: white;
+        padding: 12px 24px;
+        border-radius: 50px;
+        font-size: 14px;
+        z-index: 1000;
+        animation: fadeInUp 0.3s ease;
+    `;
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 3000);
 }
 
 // Обработчики событий
-document.getElementById('createGameBtn').addEventListener('click', createGame);
-document.getElementById('joinGameBtn').addEventListener('click', () => {
+document.getElementById('createGameBtn')?.addEventListener('click', createGame);
+document.getElementById('joinGameBtn')?.addEventListener('click', () => {
     const panel = document.getElementById('joinPanel');
-    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    if (panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
 });
-document.getElementById('confirmJoinBtn').addEventListener('click', joinGame);
-document.getElementById('cancelGameBtn').addEventListener('click', () => {
+document.getElementById('confirmJoinBtn')?.addEventListener('click', joinGame);
+document.getElementById('cancelGameBtn')?.addEventListener('click', () => {
     if (currentGameId) {
         database.ref(`games/${currentGameId}`).remove();
     }
     screens.waiting.classList.remove('active');
     screens.menu.classList.add('active');
 });
-document.getElementById('copyCodeBtn').addEventListener('click', () => {
-    const code = document.getElementById('gameCodeDisplay').textContent;
-    navigator.clipboard.writeText(code);
-    showToast('Код скопирован!');
+document.getElementById('copyCodeBtn')?.addEventListener('click', () => {
+    const code = document.getElementById('gameCodeDisplay')?.textContent;
+    if (code) {
+        navigator.clipboard.writeText(code);
+        showToast('Код скопирован!');
+    }
 });
-document.getElementById('submitBtn').addEventListener('click', submitResult);
-document.getElementById('nextRoundBtn').addEventListener('click', nextRoundOnline);
-document.getElementById('rulesBtn').addEventListener('click', () => {
+document.getElementById('submitBtn')?.addEventListener('click', submitResult);
+document.getElementById('nextRoundBtn')?.addEventListener('click', nextRoundOnline);
+document.getElementById('rulesBtn')?.addEventListener('click', () => {
     screens.menu.classList.remove('active');
     screens.rules.classList.add('active');
 });
-document.getElementById('backFromRulesBtn').addEventListener('click', () => {
+document.getElementById('backFromRulesBtn')?.addEventListener('click', () => {
     screens.rules.classList.remove('active');
     screens.menu.classList.add('active');
 });
-document.getElementById('playAgainOnlineBtn').addEventListener('click', () => {
+document.getElementById('playAgainOnlineBtn')?.addEventListener('click', () => {
     screens.results.classList.remove('active');
     screens.menu.classList.add('active');
 });
-document.getElementById('menuFromResultsBtn').addEventListener('click', () => {
+document.getElementById('menuFromResultsBtn')?.addEventListener('click', () => {
     screens.results.classList.remove('active');
     screens.menu.classList.add('active');
 });
 
-document.getElementById('hueSlider').addEventListener('input', updateCurrentColor);
-document.getElementById('satSlider').addEventListener('input', updateCurrentColor);
-document.getElementById('briSlider').addEventListener('input', updateCurrentColor);
+document.getElementById('hueSlider')?.addEventListener('input', updateCurrentColor);
+document.getElementById('satSlider')?.addEventListener('input', updateCurrentColor);
+document.getElementById('briSlider')?.addEventListener('input', updateCurrentColor);
 
+// Инициализация
+console.log('ColorMatch Online готов!');
 tg.ready();
