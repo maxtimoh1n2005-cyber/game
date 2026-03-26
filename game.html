@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>ColorMatch Duel - Telegram Mini App</title>
+    <!-- Telegram Web App SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js?56"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+            padding: 16px;
+            min-height: 100vh;
+        }
+
+        /* Основные контейнеры */
+        .screen {
+            display: none;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px);}
+            to { opacity: 1; transform: translateY(0);}
+        }
+
+        /* Карточки и элементы */
+        .card {
+            background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+            border-radius: 24px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .button {
+            background: var(--tg-theme-button-color, #2481cc);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            border: none;
+            padding: 14px 20px;
+            border-radius: 60px;
+            font-size: 17px;
+            font-weight: 600;
+            width: 100%;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            text-align: center;
+        }
+
+        .button:active {
+            opacity: 0.7;
+        }
+
+        .button-outline {
+            background: transparent;
+            border: 1px solid var(--tg-theme-button-color, #2481cc);
+            color: var(--tg-theme-button-color, #2481cc);
+        }
+
+        .color-preview {
+            width: 100%;
+            height: 160px;
+            border-radius: 20px;
+            margin: 16px 0;
+            border: 2px solid rgba(0,0,0,0.1);
+            transition: background 0.05s linear;
+        }
+
+        .slider-container {
+            margin: 20px 0;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 40px;
+            -webkit-appearance: none;
+            background: transparent;
+        }
+
+        input[type="range"]:focus {
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            background: #ccc;
+            border-radius: 10px;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 28px;
+            width: 28px;
+            border-radius: 50%;
+            background: var(--tg-theme-button-color, #2481cc);
+            margin-top: -11px;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+
+        .score-badge {
+            font-size: 24px;
+            font-weight: 800;
+            text-align: center;
+            margin: 10px 0;
+        }
+
+        .comparison-row {
+            display: flex;
+            gap: 16px;
+            margin: 20px 0;
+        }
+
+        .color-box {
+            flex: 1;
+            text-align: center;
+        }
+
+        .color-swatch {
+            height: 100px;
+            border-radius: 16px;
+            margin-bottom: 8px;
+        }
+
+        .result-percent {
+            font-size: 32px;
+            font-weight: bold;
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .players-list {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .player-tab {
+            flex: 1;
+            padding: 12px;
+            background: var(--tg-theme-secondary-bg-color, #e9e9e9);
+            border-radius: 20px;
+            text-align: center;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .player-tab.active {
+            background: var(--tg-theme-button-color, #2481cc);
+            color: white;
+        }
+
+        .timer {
+            font-size: 48px;
+            font-weight: bold;
+            text-align: center;
+            font-family: monospace;
+            background: rgba(0,0,0,0.05);
+            border-radius: 60px;
+            padding: 12px;
+            margin: 10px 0;
+        }
+
+        .flex-between {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .round-info {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .winner-msg {
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+
+        hr {
+            margin: 16px 0;
+            border: none;
+            height: 1px;
+            background: rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+
+<!-- ЭКРАН МЕНЮ -->
+<div id="menuScreen" class="screen active">
+    <div class="card" style="text-align: center;">
+        <h2>🎨 ColorMatch Duel</h2>
+        <p style="margin: 12px 0;">Воссоздай цвет по памяти!</p>
+        <div style="height: 100px; background: linear-gradient(90deg, red, orange, yellow, green, blue, indigo, violet); border-radius: 20px; margin: 20px 0;"></div>
+        <button id="playDuoBtn" class="button">👥 Играть вдвоем</button>
+        <button id="howToBtn" class="button button-outline" style="margin-top: 12px;">❓ Как играть</button>
+    </div>
+</div>
+
+<!-- ЭКРАН HOW TO -->
+<div id="howtoScreen" class="screen">
+    <div class="card">
+        <h3>📖 Правила игры</h3>
+        <ul style="margin: 16px 0 16px 20px; line-height: 1.5;">
+            <li>🎲 Каждый игрок проходит 5 раундов.</li>
+            <li>⏱️ На 3 секунды показывается случайный цвет.</li>
+            <li>🎛️ С помощью ползунков нужно воссоздать этот цвет.</li>
+            <li>🔴 Ползунок 1: <strong>Оттенок (Hue)</strong> — от красного до красного (0°-360°).</li>
+            <li>🎨 Ползунок 2: <strong>Насыщенность (Saturation)</strong>.</li>
+            <li>💡 Ползунок 3: <strong>Яркость (Brightness/Value)</strong>.</li>
+            <li>📊 После настройки показывается точность в %.</li>
+            <li>🏆 Побеждает тот, у кого средняя точность выше.</li>
+        </ul>
+        <button id="backFromHowto" class="button">Назад в меню</button>
+    </div>
+</div>
+
+<!-- ЭКРАН ИГРЫ (Дуэль) -->
+<div id="gameScreen" class="screen">
+    <div class="flex-between" style="margin-bottom: 12px;">
+        <div class="round-info" id="roundIndicator">Раунд 1 / 5</div>
+        <div id="turnIndicator" style="font-weight: bold; background: #00000020; padding: 6px 12px; border-radius: 40px;">Ход: Игрок 1</div>
+    </div>
+
+    <!-- Блок показа оригинального цвета (таймер) -->
+    <div id="showColorBlock" class="card" style="text-align: center;">
+        <div id="targetColorPreview" class="color-preview" style="background: #cccccc;"></div>
+        <div id="timerDisplay" class="timer">3</div>
+        <p style="font-size: 14px; opacity: 0.7;">Запомните цвет!</p>
+    </div>
+
+    <!-- Блок настройки (изначально скрыт) -->
+    <div id="guessBlock" style="display: none;">
+        <div class="card">
+            <div class="color-preview" id="currentMixPreview" style="background: #ff0000;"></div>
+            
+            <div class="slider-container">
+                <div class="slider-label"><span>🔴 Оттенок (Hue)</span><span id="hueVal">0°</span></div>
+                <input type="range" id="hueSlider" min="0" max="360" step="1" value="0">
+            </div>
+            <div class="slider-container">
+                <div class="slider-label"><span>🌈 Насыщенность (Saturation)</span><span id="satVal">100%</span></div>
+                <input type="range" id="satSlider" min="0" max="100" step="1" value="100">
+            </div>
+            <div class="slider-container">
+                <div class="slider-label"><span>💡 Яркость (Brightness)</span><span id="briVal">100%</span></div>
+                <input type="range" id="briSlider" min="0" max="100" step="1" value="100">
+            </div>
+            <button id="submitGuessBtn" class="button">🎯 Готово! Проверить цвет</button>
+        </div>
+    </div>
+
+    <!-- Блок результата раунда (сравнение) -->
+    <div id="resultBlock" style="display: none;">
+        <div class="card">
+            <div class="comparison-row">
+                <div class="color-box">
+                    <div class="color-swatch" id="origSwatch"></div>
+                    <span>🎨 Оригинал</span>
+                </div>
+                <div class="color-box">
+                    <div class="color-swatch" id="playerSwatch"></div>
+                    <span>🖌️ Ваш цвет</span>
+                </div>
+            </div>
+            <div class="result-percent" id="accuracyPercent">Точность: 0%</div>
+            <button id="nextRoundBtn" class="button">➡️ Следующий раунд</button>
+        </div>
+    </div>
+</div>
+
+<!-- ЭКРАН РЕЗУЛЬТАТОВ (Таблица) -->
+<div id="resultsScreen" class="screen">
+    <div class="card">
+        <h2 style="text-align: center;">🏆 Результаты дуэли</h2>
+        <div id="scoreTable" style="margin: 20px 0;"></div>
+        <div id="winnerMessage" class="winner-msg"></div>
+        <button id="playAgainBtn" class="button">🔄 Играть снова</button>
+        <button id="menuFromResultsBtn" class="button button-outline" style="margin-top: 12px;">🏠 Главное меню</button>
+    </div>
+</div>
+
+<script>
+    // ---------- Инициализация Telegram Web App ----------
+    const tg = window.Telegram.WebApp;
+    tg.expand();  // Разворачиваем на весь экран
+    tg.enableClosingConfirmation();
+
+    // ---------- Глобальные переменные игры ----------
+    let gameState = {
+        mode: 'duo',           // duo only для этого билда
+        players: [
+            { name: 'Игрок 1', scores: [], totalAvg: 0, roundsPlayed: 0 },
+            { name: 'Игрок 2', scores: [], totalAvg: 0, roundsPlayed: 0 }
+        ],
+        currentPlayer: 0,      // 0 или 1
+        currentRound: 1,       // 1..5
+        originalColor: { h: 0, s: 0, v: 0 },   // HSV
+        originalRgb: { r: 0, g: 0, b: 0 },
+        roundActive: false,
+        timerInterval: null,
+        waitingForNext: false
+    };
+
+    // DOM элементы
+    const menuScreen = document.getElementById('menuScreen');
+    const howtoScreen = document.getElementById('howtoScreen');
+    const gameScreen = document.getElementById('gameScreen');
+    const resultsScreen = document.getElementById('resultsScreen');
+    
+    const playDuoBtn = document.getElementById('playDuoBtn');
+    const howToBtn = document.getElementById('howToBtn');
+    const backFromHowto = document.getElementById('backFromHowto');
+    const playAgainBtn = document.getElementById('playAgainBtn');
+    const menuFromResultsBtn = document.getElementById('menuFromResultsBtn');
+    
+    // Игровые элементы
+    const showColorBlock = document.getElementById('showColorBlock');
+    const guessBlock = document.getElementById('guessBlock');
+    const resultBlock = document.getElementById('resultBlock');
+    const targetColorPreview = document.getElementById('targetColorPreview');
+    const timerDisplay = document.getElementById('timerDisplay');
+    const roundIndicator = document.getElementById('roundIndicator');
+    const turnIndicator = document.getElementById('turnIndicator');
+    const currentMixPreview = document.getElementById('currentMixPreview');
+    const hueSlider = document.getElementById('hueSlider');
+    const satSlider = document.getElementById('satSlider');
+    const briSlider = document.getElementById('briSlider');
+    const hueVal = document.getElementById('hueVal');
+    const satVal = document.getElementById('satVal');
+    const briVal = document.getElementById('briVal');
+    const submitGuessBtn = document.getElementById('submitGuessBtn');
+    const nextRoundBtn = document.getElementById('nextRoundBtn');
+    const origSwatch = document.getElementById('origSwatch');
+    const playerSwatch = document.getElementById('playerSwatch');
+    const accuracyPercentSpan = document.getElementById('accuracyPercent');
+    const scoreTableDiv = document.getElementById('scoreTable');
+    const winnerMessageDiv = document.getElementById('winnerMessage');
+
+    // ---------- Вспомогательные функции HSV <-> RGB ----------
+    function hsvToRgb(h, s, v) {
+        h = (h % 360 + 360) % 360;
+        s = Math.min(100, Math.max(0, s)) / 100;
+        v = Math.min(100, Math.max(0, v)) / 100;
+        let c = v * s;
+        let x = c * (1 - Math.abs((h / 60) % 2 - 1));
+        let m = v - c;
+        let rp = 0, gp = 0, bp = 0;
+        if (h >= 0 && h < 60) { rp = c; gp = x; bp = 0; }
+        else if (h >= 60 && h < 120) { rp = x; gp = c; bp = 0; }
+        else if (h >= 120 && h < 180) { rp = 0; gp = c; bp = x; }
+        else if (h >= 180 && h < 240) { rp = 0; gp = x; bp = c; }
+        else if (h >= 240 && h < 300) { rp = x; gp = 0; bp = c; }
+        else { rp = c; gp = 0; bp = x; }
+        let r = Math.round((rp + m) * 255);
+        let g = Math.round((gp + m) * 255);
+        let b = Math.round((bp + m) * 255);
+        return { r, g, b };
+    }
+
+    function rgbToHsv(r, g, b) {
+        r /= 255, g /= 255, b /= 255;
+        let max = Math.max(r, g, b), min = Math.min(r, g, b);
+        let h, s, v = max;
+        let d = max - min;
+        s = max === 0 ? 0 : d / max;
+        if (max === min) h = 0;
+        else {
+            switch (max) {
+                case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                case g: h = (b - r) / d + 2; break;
+                case b: h = (r - g) / d + 4; break;
+            }
+            h *= 60;
+        }
+        return { h: Math.round(h), s: Math.round(s * 100), v: Math.round(v * 100) };
+    }
+
+    function hsvToCss(h, s, v) {
+        const rgb = hsvToRgb(h, s, v);
+        return `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
+    }
+
+    // Обновление превью микса из ползунков
+    function updateMixPreview() {
+        let h = parseInt(hueSlider.value);
+        let s = parseInt(satSlider.value);
+        let v = parseInt(briSlider.value);
+        hueVal.innerText = h + "°";
+        satVal.innerText = s + "%";
+        briVal.innerText = v + "%";
+        currentMixPreview.style.background = hsvToCss(h, s, v);
+    }
+
+    // Подписка на ползунки
+    hueSlider.addEventListener('input', updateMixPreview);
+    satSlider.addEventListener('input', updateMixPreview);
+    briSlider.addEventListener('input', updateMixPreview);
+
+    // Генерация случайного цвета (HSV)
+    function getRandomColor() {
+        return {
+            h: Math.floor(Math.random() * 360),
+            s: 50 + Math.floor(Math.random() * 50),   // 50-100% насыщенность для яркости
+            v: 60 + Math.floor(Math.random() * 40)     // 60-100% яркость
+        };
+    }
+
+    // Функция расчета точности (на основе Евклидова расстояния в RGB, процентное соотношение)
+    function calculateAccuracy(rgb1, rgb2) {
+        const deltaR = rgb1.r - rgb2.r;
+        const deltaG = rgb1.g - rgb2.g;
+        const deltaB = rgb1.b - rgb2.b;
+        const distance = Math.sqrt(deltaR*deltaR + deltaG*deltaG + deltaB*deltaB);
+        const maxDistance = Math.sqrt(255*255*3);
+        let accuracy = (1 - (distance / maxDistance)) * 100;
+        accuracy = Math.min(100, Math.max(0, accuracy));
+        return Math.round(accuracy * 100) / 100;
+    }
+
+    // Очистка таймера
+    function stopTimer() {
+        if (gameState.timerInterval) {
+            clearInterval(gameState.timerInterval);
+            gameState.timerInterval = null;
+        }
+    }
+
+    // Начать этап показа цвета (таймер 3 секунды)
+    function startShowColor() {
+        stopTimer();
+        // Генерируем новый цвет
+        const randColor = getRandomColor();
+        gameState.originalColor = randColor;
+        const rgbOrig = hsvToRgb(randColor.h, randColor.s, randColor.v);
+        gameState.originalRgb = rgbOrig;
+        targetColorPreview.style.background = `rgb(${rgbOrig.r}, ${rgbOrig.g}, ${rgbOrig.b})`;
+        
+        showColorBlock.style.display = "block";
+        guessBlock.style.display = "none";
+        resultBlock.style.display = "none";
+        
+        let timeLeft = 3;
+        timerDisplay.innerText = timeLeft;
+        
+        gameState.timerInterval = setInterval(() => {
+            timeLeft--;
+            timerDisplay.innerText = timeLeft >= 0 ? timeLeft : 0;
+            if (timeLeft < 0) {
+                stopTimer();
+                // Время вышло, переходим к настройке цвета
+                showColorBlock.style.display = "none";
+                guessBlock.style.display = "block";
+                // Сброс ползунков на насыщенные значения (по умолчанию яркий красный, но можно любой)
+                // Устанавливаем ползунки на значения: H = оригинал? Нет, пусть игрок настраивает с нуля? Лучше сбросить на 0, 100, 100 (красный)
+                hueSlider.value = gameState.originalColor.h; // можно начать с подсказки? Нет, по логике игры игрок должен помнить, но начинаем с нейтрального? 
+                // Для удобства сделаем начальное положение на 0,100,100 но игрок сам крутит. Для честности - пусть сбрасывается на случайный? 
+                // Лучше поставить слайдеры на последний известный? Нет, пусть начинают с красного насыщенного.
+                hueSlider.value = 0;
+                satSlider.value = 100;
+                briSlider.value = 100;
+                updateMixPreview();
+            }
+        }, 1000);
+    }
+
+    // Обработка отправки ответа (игрок закончил настройку)
+    function submitGuess() {
+        if (gameState.waitingForNext) return;
+        stopTimer();
+        const guessedH = parseInt(hueSlider.value);
+        const guessedS = parseInt(satSlider.value);
+        const guessedV = parseInt(briSlider.value);
+        const guessedRgb = hsvToRgb(guessedH, guessedS, guessedV);
+        const accuracy = calculateAccuracy(gameState.originalRgb, guessedRgb);
+        
+        // Сохраняем результат игрока
+        const currentPlayerObj = gameState.players[gameState.currentPlayer];
+        currentPlayerObj.scores.push(accuracy);
+        
+        // Показать блок сравнения
+        guessBlock.style.display = "none";
+        resultBlock.style.display = "block";
+        
+        // Отрисовка сравнения
+        origSwatch.style.background = `rgb(${gameState.originalRgb.r}, ${gameState.originalRgb.g}, ${gameState.originalRgb.b})`;
+        playerSwatch.style.background = `rgb(${guessedRgb.r}, ${guessedRgb.g}, ${guessedRgb.b})`;
+        accuracyPercentSpan.innerText = `Точность: ${accuracy}%`;
+        
+        gameState.waitingForNext = true;
+    }
+    
+    // Переход к следующему раунду или игроку
+    function nextRound() {
+        if (!gameState.waitingForNext) return;
+        gameState.waitingForNext = false;
+        
+        const currentPlayerIdx = gameState.currentPlayer;
+        const currentPlayer = gameState.players[currentPlayerIdx];
+        currentPlayer.roundsPlayed++;
+        
+        // Проверяем, закончил ли текущий игрок все 5 раундов
+        if (currentPlayer.roundsPlayed >= 5) {
+            // Текущий игрок закончил. Переключаем на следующего, если оба не закончили
+            if (gameState.currentPlayer === 0 && gameState.players[1].roundsPlayed < 5) {
+                // Переключение на игрока 2
+                gameState.currentPlayer = 1;
+                gameState.currentRound = 1;
+                gameState.players[1].roundsPlayed = 0; // roundsPlayed для второго мы будем увеличивать, но у него сейчас 0, ок
+                // но важно: roundsPlayed для игрока2 еще 0, начнем с 1 раунда
+                gameState.currentRound = 1;
+                startNewRoundForCurrent();
+            } 
+            else if (gameState.currentPlayer === 1 || (gameState.currentPlayer === 0 && gameState.players[1].roundsPlayed >= 5)) {
+                // Оба закончили (либо только что закончил второй, либо первый закончил и второй уже закончил)
+                endGameAndShowResults();
+            }
+            else {
+                // Если первый закончил, а второй еще не начинал - переключаем уже выше, но дополнительно
+                if (gameState.currentPlayer === 0 && gameState.players[1].roundsPlayed < 5) {
+                    gameState.currentPlayer = 1;
+                    gameState.currentRound = 1;
+                    startNewRoundForCurrent();
+                } else {
+                    endGameAndShowResults();
+                }
+            }
+        } else {
+            // Тот же игрок, следующий раунд
+            gameState.currentRound++;
+            startNewRoundForCurrent();
+        }
+    }
+    
+    function startNewRoundForCurrent() {
+        gameState.waitingForNext = false;
+        // Обновляем UI индикаторы
+        roundIndicator.innerText = `Раунд ${gameState.currentRound} / 5`;
+        turnIndicator.innerText = `Ход: ${gameState.players[gameState.currentPlayer].name}`;
+        // Показываем этап показа цвета
+        startShowColor();
+    }
+    
+    // Завершение игры и показ результатов
+    function endGameAndShowResults() {
+        // Вычисляем средние
+        for (let i = 0; i < gameState.players.length; i++) {
+            let p = gameState.players[i];
+            if (p.scores.length === 0) p.totalAvg = 0;
+            else {
+                let sum = p.scores.reduce((a,b) => a + b, 0);
+                p.totalAvg = sum / p.scores.length;
+            }
+        }
+        // Построение таблицы
+        let tableHtml = `<div style="display: flex; justify-content: space-between; font-weight: bold; padding: 12px; background: rgba(0,0,0,0.05); border-radius: 16px;">
+                            <span>Игрок</span><span>Средняя точность</span><span>Лучший раунд</span>
+                         </div>`;
+        for (let i = 0; i < gameState.players.length; i++) {
+            const p = gameState.players[i];
+            const best = p.scores.length ? Math.max(...p.scores) : 0;
+            tableHtml += `<div style="display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid rgba(0,0,0,0.05);">
+                            <span>${p.name}</span><span><strong>${p.totalAvg.toFixed(2)}%</strong></span><span>${best.toFixed(1)}%</span>
+                          </div>`;
+        }
+        scoreTableDiv.innerHTML = tableHtml;
+        let winnerText = "";
+        if (gameState.players[0].totalAvg > gameState.players[1].totalAvg) winnerText = "🏆 Победитель: Игрок 1! 🏆";
+        else if (gameState.players[1].totalAvg > gameState.players[0].totalAvg) winnerText = "🏆 Победитель: Игрок 2! 🏆";
+        else winnerText = "🤝 Ничья! Отличная игра!";
+        winnerMessageDiv.innerText = winnerText;
+        
+        // Показываем экран результатов, скрываем игру
+        gameScreen.classList.remove('active');
+        resultsScreen.classList.add('active');
+    }
+    
+    // Инициализация новой дуэли (сброс состояния)
+    function initDuoGame() {
+        stopTimer();
+        gameState = {
+            mode: 'duo',
+            players: [
+                { name: 'Игрок 1', scores: [], totalAvg: 0, roundsPlayed: 0 },
+                { name: 'Игрок 2', scores: [], totalAvg: 0, roundsPlayed: 0 }
+            ],
+            currentPlayer: 0,
+            currentRound: 1,
+            originalColor: { h: 0, s: 0, v: 0 },
+            originalRgb: { r: 0, g: 0, b: 0 },
+            roundActive: false,
+            timerInterval: null,
+            waitingForNext: false
+        };
+        
+        // UI сброс
+        showColorBlock.style.display = "block";
+        guessBlock.style.display = "none";
+        resultBlock.style.display = "none";
+        roundIndicator.innerText = `Раунд 1 / 5`;
+        turnIndicator.innerText = `Ход: Игрок 1`;
+        
+        gameScreen.classList.add('active');
+        menuScreen.classList.remove('active');
+        howtoScreen.classList.remove('active');
+        resultsScreen.classList.remove('active');
+        
+        startNewRoundForCurrent();
+    }
+    
+    // Переключение экранов
+    function showMenu() {
+        stopTimer();
+        menuScreen.classList.add('active');
+        howtoScreen.classList.remove('active');
+        gameScreen.classList.remove('active');
+        resultsScreen.classList.remove('active');
+    }
+    
+    // Обработчики
+    playDuoBtn.addEventListener('click', () => {
+        initDuoGame();
+    });
+    
+    howToBtn.addEventListener('click', () => {
+        menuScreen.classList.remove('active');
+        howtoScreen.classList.add('active');
+    });
+    
+    backFromHowto.addEventListener('click', showMenu);
+    playAgainBtn.addEventListener('click', () => {
+        initDuoGame();
+    });
+    menuFromResultsBtn.addEventListener('click', showMenu);
+    
+    submitGuessBtn.addEventListener('click', submitGuess);
+    nextRoundBtn.addEventListener('click', nextRound);
+    
+    // дополнительно кнопка "Назад" в меню через Telegram? не требуется
+    tg.ready();
+    console.log("Mini App Ready: ColorMatch Duel");
+</script>
+</body>
+</html>
