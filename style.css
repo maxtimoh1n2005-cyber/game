@@ -326,3 +326,95 @@ h1 {
         height: 100px;
     }
 }
+
+/* Добавьте эти стили к существующим */
+
+.input-field {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid var(--button-color);
+    border-radius: 12px;
+    font-size: 16px;
+    background: var(--bg-color);
+    color: var(--text-color);
+    text-align: center;
+    letter-spacing: 2px;
+    font-weight: bold;
+}
+
+.game-code-box {
+    text-align: center;
+    margin: 24px 0;
+    padding: 20px;
+    background: var(--bg-color);
+    border-radius: var(--border-radius);
+}
+
+.game-code {
+    font-size: 32px;
+    font-weight: bold;
+    letter-spacing: 4px;
+    color: var(--button-color);
+    margin: 12px 0;
+    font-family: monospace;
+}
+
+.loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid rgba(36, 129, 204, 0.2);
+    border-top-color: var(--button-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 20px auto;
+}
+
+.opponent-info {
+    margin-bottom: 16px;
+}
+
+.opponent-card {
+    background: var(--secondary-bg);
+    border-radius: var(--border-radius);
+    padding: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.waiting-indicator {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.toast-message {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 50px;
+    font-size: 14px;
+    z-index: 1000;
+    animation: fadeInUp 0.3s ease;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
