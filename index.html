@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>ColorMatch Duel</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://telegram.org/js/telegram-web-app.js?56"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Меню -->
+        <div id="menuScreen" class="screen active">
+            <div class="card">
+                <div class="logo">
+                    <div class="gradient-circle"></div>
+                    <h1>🎨 ColorMatch Duel</h1>
+                </div>
+                <p class="subtitle">Проверь свою цветовую память!</p>
+                <button id="playBtn" class="btn btn-primary">👥 Играть вдвоем</button>
+                <button id="rulesBtn" class="btn btn-outline">📖 Правила</button>
+                <div class="made-by">
+                    <span>Соревнуйся с другом</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Правила -->
+        <div id="rulesScreen" class="screen">
+            <div class="card">
+                <h2>📖 Правила игры</h2>
+                <div class="rules-list">
+                    <div class="rule-item">
+                        <span class="rule-icon">🎲</span>
+                        <span>Каждый игрок проходит 5 раундов</span>
+                    </div>
+                    <div class="rule-item">
+                        <span class="rule-icon">⏱️</span>
+                        <span>На 3 секунды показывается случайный цвет</span>
+                    </div>
+                    <div class="rule-item">
+                        <span class="rule-icon">🎛️</span>
+                        <span>Воссоздай цвет с помощью ползунков</span>
+                    </div>
+                    <div class="rule-item">
+                        <span class="rule-icon">🔴</span>
+                        <span><strong>Оттенок</strong> — от красного до красного (0-360°)</span>
+                    </div>
+                    <div class="rule-item">
+                        <span class="rule-icon">🌈</span>
+                        <span><strong>Насыщенность</strong> — интенсивность цвета</span>
+                    </div>
+                    <div class="rule-item">
+                        <span class="rule-icon">💡</span>
+                        <span><strong>Яркость</strong> — светлота цвета</span>
+                    </div>
+                </div>
+                <button id="backFromRules" class="btn btn-primary">Назад в меню</button>
+            </div>
+        </div>
+
+        <!-- Игра -->
+        <div id="gameScreen" class="screen">
+            <div class="game-header">
+                <div class="round-info">
+                    Раунд <span id="currentRound">1</span>/5
+                </div>
+                <div id="turnIndicator" class="turn-indicator">
+                    Ход: Игрок 1
+                </div>
+            </div>
+
+            <!-- Показать цвет -->
+            <div id="showColorBlock" class="show-color-block">
+                <div class="color-preview-large" id="targetColor"></div>
+                <div class="timer-circle">
+                    <div class="timer-number" id="timerNumber">3</div>
+                </div>
+                <p class="hint">Запомните цвет!</p>
+            </div>
+
+            <!-- Настройка цвета -->
+            <div id="guessBlock" class="guess-block" style="display: none;">
+                <div class="color-preview-small" id="currentColor"></div>
+                
+                <div class="slider-group">
+                    <label class="slider-label">
+                        <span>🔴 Оттенок</span>
+                        <span id="hueValue">0°</span>
+                    </label>
+                    <input type="range" id="hueSlider" min="0" max="360" value="0" class="slider">
+                </div>
+
+                <div class="slider-group">
+                    <label class="slider-label">
+                        <span>🌈 Насыщенность</span>
+                        <span id="satValue">100%</span>
+                    </label>
+                    <input type="range" id="satSlider" min="0" max="100" value="100" class="slider">
+                </div>
+
+                <div class="slider-group">
+                    <label class="slider-label">
+                        <span>💡 Яркость</span>
+                        <span id="briValue">100%</span>
+                    </label>
+                    <input type="range" id="briSlider" min="0" max="100" value="100" class="slider">
+                </div>
+
+                <button id="submitBtn" class="btn btn-primary">🎯 Готово!</button>
+            </div>
+
+            <!-- Результат раунда -->
+            <div id="resultBlock" class="result-block" style="display: none;">
+                <h3>Результат раунда</h3>
+                <div class="color-comparison">
+                    <div class="color-compare-item">
+                        <div class="color-swatch" id="originalSwatch"></div>
+                        <span>Оригинал</span>
+                    </div>
+                    <div class="color-compare-item">
+                        <div class="color-swatch" id="playerSwatch"></div>
+                        <span>Ваш цвет</span>
+                    </div>
+                </div>
+                <div class="accuracy-circle">
+                    <div class="accuracy-percent" id="accuracyPercent">0%</div>
+                </div>
+                <button id="nextRoundBtn" class="btn btn-primary">Следующий раунд →</button>
+            </div>
+        </div>
+
+        <!-- Результаты -->
+        <div id="resultsScreen" class="screen">
+            <div class="card">
+                <h2>🏆 Результаты</h2>
+                <div class="scoreboard" id="scoreboard"></div>
+                <div id="winnerMessage" class="winner-message"></div>
+                <button id="playAgainBtn" class="btn btn-primary">🔄 Играть снова</button>
+                <button id="menuBtn" class="btn btn-outline">🏠 Главное меню</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
